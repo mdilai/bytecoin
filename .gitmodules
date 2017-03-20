@@ -1,0 +1,6 @@
+[submodule "external/rocksdb"]
+	path = external/rocksdb
+	url = https://github.com/facebook/rocksdb
+[submodule "boost-cmake"]
+	path = boost-cmake
+	url = https://github.com/Orphis/boost-cmake

@@ -12,7 +12,7 @@ enable_testing()
 # copy CTestCustom.cmake to build dir to disable long running tests in 'make test'
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/CTestCustom.cmake ${CMAKE_CURRENT_BINARY_DIR})
 
-project(Bytecoin)
+project(Jweega)
 
 include_directories(include src external "${CMAKE_CURRENT_BINARY_DIR}/version")
 if(APPLE)
@@ -29,6 +29,7 @@ else()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/Linux)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/Posix)
 endif()
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/rocksdb)
 
 set(STATIC ${MSVC} CACHE BOOL "Link libraries statically")
 
@@ -111,8 +112,15 @@ if(STATIC)
   set(Boost_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_RUNTIME ON)
 endif()
-find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread date_time chrono regex serialization program_options)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+add_subdirectory(${CMAKE_SOURCE_DIR}/boost-cmake)
+
+#find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread date_time chrono regex serialization program_options)
+#include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
+set(Boost_LIBRARIES "Boost::system" "Boost::filesystem" "Boost::thread" "Boost::date_time" "Boost::chrono" "Boost::regex" "Boost::serialization" "Boost::program_options")
+include_directories(${BOOST_SOURCE})
+add_definitions(-DBOOST_ALL_NO_LIB)
+
 if(MINGW)
   set(Boost_LIBRARIES "${Boost_LIBRARIES};ws2_32;mswsock")
 elseif(APPLE)
