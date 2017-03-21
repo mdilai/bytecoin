@@ -12,9 +12,8 @@
 
 #include "port/port.h"
 #include "rocksdb/env.h"
-#include "util/logging.h"
-#include "util/mutexlock.h"
 #include "util/sst_file_manager_impl.h"
+#include "util/mutexlock.h"
 #include "util/sync_point.h"
 
 namespace rocksdb {
@@ -30,8 +29,13 @@ DeleteScheduler::DeleteScheduler(Env* env, const std::string& trash_dir,
       cv_(&mu_),
       info_log_(info_log),
       sst_file_manager_(sst_file_manager) {
-  bg_thread_.reset(
-      new port::Thread(&DeleteScheduler::BackgroundEmptyTrash, this));
+  if (rate_bytes_per_sec_ <= 0) {
+    // Rate limiting is disabled
+    bg_thread_.reset();
+  } else {
+    bg_thread_.reset(
+        new port::Thread(&DeleteScheduler::BackgroundEmptyTrash, this));
+  }
 }
 
 DeleteScheduler::~DeleteScheduler() {
@@ -47,9 +51,8 @@ DeleteScheduler::~DeleteScheduler() {
 
 Status DeleteScheduler::DeleteFile(const std::string& file_path) {
   Status s;
-  if (rate_bytes_per_sec_.load() <= 0) {
+  if (rate_bytes_per_sec_ <= 0) {
     // Rate limiting is disabled
-    TEST_SYNC_POINT("DeleteScheduler::DeleteFile");
     s = env_->DeleteFile(file_path);
     if (s.ok() && sst_file_manager_) {
       sst_file_manager_->OnDeleteFile(file_path);
@@ -61,8 +64,9 @@ Status DeleteScheduler::DeleteFile(const std::string& file_path) {
   std::string path_in_trash;
   s = MoveToTrash(file_path, &path_in_trash);
   if (!s.ok()) {
-    ROCKS_LOG_ERROR(info_log_, "Failed to move %s to trash directory (%s)",
-                    file_path.c_str(), trash_dir_.c_str());
+    Log(InfoLogLevel::ERROR_LEVEL, info_log_,
+        "Failed to move %s to trash directory (%s)", file_path.c_str(),
+        trash_dir_.c_str());
     s = env_->DeleteFile(file_path);
     if (s.ok() && sst_file_manager_) {
       sst_file_manager_->OnDeleteFile(file_path);
@@ -143,16 +147,7 @@ void DeleteScheduler::BackgroundEmptyTrash() {
     // Delete all files in queue_
     uint64_t start_time = env_->NowMicros();
     uint64_t total_deleted_bytes = 0;
-    int64_t current_delete_rate = rate_bytes_per_sec_.load();
     while (!queue_.empty() && !closing_) {
-      if (current_delete_rate != rate_bytes_per_sec_.load()) {
-        // User changed the delete rate
-        current_delete_rate = rate_bytes_per_sec_.load();
-        start_time = env_->NowMicros();
-        total_deleted_bytes = 0;
-      }
-
-      // Get new file to delete
       std::string path_in_trash = queue_.front();
       queue_.pop();
 
@@ -169,16 +164,9 @@ void DeleteScheduler::BackgroundEmptyTrash() {
       }
 
       // Apply penlty if necessary
-      uint64_t total_penlty;
-      if (current_delete_rate > 0) {
-        // rate limiting is enabled
-        total_penlty =
-            ((total_deleted_bytes * kMicrosInSecond) / current_delete_rate);
-        while (!closing_ && !cv_.TimedWait(start_time + total_penlty)) {}
-      } else {
-        // rate limiting is disabled
-        total_penlty = 0;
-      }
+      uint64_t total_penlty =
+          ((total_deleted_bytes * kMicrosInSecond) / rate_bytes_per_sec_);
+      while (!closing_ && !cv_.TimedWait(start_time + total_penlty)) {}
       TEST_SYNC_POINT_CALLBACK("DeleteScheduler::BackgroundEmptyTrash:Wait",
                                &total_penlty);
 
@@ -203,8 +191,9 @@ Status DeleteScheduler::DeleteTrashFile(const std::string& path_in_trash,
 
   if (!s.ok()) {
     // Error while getting file size or while deleting
-    ROCKS_LOG_ERROR(info_log_, "Failed to delete %s from trash -- %s",
-                    path_in_trash.c_str(), s.ToString().c_str());
+    Log(InfoLogLevel::ERROR_LEVEL, info_log_,
+        "Failed to delete %s from trash -- %s", path_in_trash.c_str(),
+        s.ToString().c_str());
     *deleted_bytes = 0;
   } else {
     *deleted_bytes = file_size;
