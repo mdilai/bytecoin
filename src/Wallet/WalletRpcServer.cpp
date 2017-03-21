@@ -129,8 +129,8 @@ void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, C
 
 //------------------------------------------------------------------------------------------------------------------------------
 bool wallet_rpc_server::on_getbalance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res) {
-  res.locked_amount = m_wallet.pendingBalance();
-  res.available_balance = m_wallet.actualBalance();
+  res.locked_amount = std::to_string(m_wallet.pendingBalance());
+  res.available_balance = std::to_string(m_wallet.actualBalance());
   return true;
 }
 //------------------------------------------------------------------------------------------------------------------------------
@@ -229,9 +229,9 @@ bool wallet_rpc_server::on_get_payments(const wallet_rpc::COMMAND_RPC_GET_PAYMEN
     if (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId == expectedPaymentId) {
       wallet_rpc::payment_details rpc_payment;
       rpc_payment.tx_hash = Common::podToHex(txInfo.hash);
-      rpc_payment.amount = txInfo.totalAmount;
-      rpc_payment.block_height = txInfo.blockHeight;
-      rpc_payment.unlock_time = txInfo.unlockTime;
+      rpc_payment.amount = std::to_string(txInfo.totalAmount);
+      rpc_payment.block_height = std::to_string(txInfo.blockHeight);
+      rpc_payment.unlock_time = std::to_string(txInfo.unlockTime);
       res.payments.push_back(rpc_payment);
     }
   }
@@ -259,14 +259,14 @@ bool wallet_rpc_server::on_get_transfers(const wallet_rpc::COMMAND_RPC_GET_TRANS
     }
 
     wallet_rpc::Transfer transfer;
-    transfer.time = txInfo.timestamp;
+    transfer.time = std::to_string(txInfo.timestamp);
     transfer.output = txInfo.totalAmount < 0;
     transfer.transactionHash = Common::podToHex(txInfo.hash);
-    transfer.amount = std::abs(txInfo.totalAmount);
-    transfer.fee = txInfo.fee;
+    transfer.amount = std::to_string(std::abs(txInfo.totalAmount));
+    transfer.fee = std::to_string(txInfo.fee);
     transfer.address = address;
-    transfer.blockIndex = txInfo.blockHeight;
-    transfer.unlockTime = txInfo.unlockTime;
+    transfer.blockIndex = std::to_string(txInfo.blockHeight);
+    transfer.unlockTime = std::to_string(txInfo.unlockTime);
     transfer.paymentId = "";
 
     std::vector<uint8_t> extraVec;

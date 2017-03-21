@@ -38,8 +38,8 @@ using CryptoNote::ISerializer;
 
     struct response
     {
-      uint64_t locked_amount;
-      uint64_t available_balance;
+      std::string locked_amount;
+      std::string available_balance;
 
       void serialize(ISerializer& s) {
         KV_MEMBER(locked_amount)
@@ -97,9 +97,9 @@ using CryptoNote::ISerializer;
   struct payment_details
   {
     std::string tx_hash;
-    uint64_t amount;
-    uint64_t block_height;
-    uint64_t unlock_time;
+    std::string amount;
+    std::string block_height;
+    std::string unlock_time;
 
     void serialize(ISerializer& s) {
       KV_MEMBER(tx_hash)
@@ -131,15 +131,15 @@ using CryptoNote::ISerializer;
   };
 
   struct Transfer {
-    uint64_t time;
+    std::string time;
     bool output;
     std::string transactionHash;
-    uint64_t amount;
-    uint64_t fee;
+    std::string amount;
+    std::string fee;
     std::string paymentId;
     std::string address;
-    uint64_t blockIndex;
-    uint64_t unlockTime;
+    std::string blockIndex;
+    std::string unlockTime;
 
     void serialize(ISerializer& s) {
       KV_MEMBER(time)
